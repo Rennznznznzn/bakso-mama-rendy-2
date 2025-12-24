@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bakso Mama Rendy</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2ecc71">
+
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(180deg,#2ecc71,#ecfdf5);
+  overflow-x:hidden;
+}
+.page{
+  position:absolute;
+  width:100%;
+  min-height:100vh;
+  padding:20px;
+  transform:translateX(100%);
+  opacity:0;
+  transition:.4s;
+}
+.page.active{transform:translateX(0);opacity:1;}
+.page.exit{transform:translateX(-100%);opacity:0;}
+
+.card{
+  background:#fff;
+  border-radius:16px;
+  padding:16px;
+  margin-bottom:16px;
+  box-shadow:0 8px 20px rgba(0,0,0,.1);
+}
+
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:14px;
+  background:#25D366;
+  color:#fff;
+  font-size:16px;
+  font-weight:bold;
+  margin-top:10px;
+  box-shadow:0 6px 0 #1ea955;
+}
+button:active{
+  transform:translateY(3px);
+  box-shadow:0 3px 0 #1ea955;
+}
+
+.menu-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid #eee;
+}
+
+input,textarea{
+  width:100%;
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #ccc;
+}
+
+.total-box{
+  background:#e8f5e9;
+  padding:12px;
+  border-radius:12px;
+  font-size:18px;
+  font-weight:bold;
+  text-align:right;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HOME -->
+<div id="home" class="page active">
+  <div class="card">
+    <h2>🍜 Bakso Mama Rendy</h2>
+    <p>Pesan bakso favoritmu langsung dari HP</p>
+    <button onclick="kePembeli()">PEMBELI</button>
+    <button onclick="keAdmin()">ADMIN</button>
+  </div>
+</div>
+
+<!-- PEMBELI -->
+<div id="pembeli" class="page">
+  <button onclick="kembali()">⬅ Kembali</button>
+
+  <div class="card">
+    <input id="nama" placeholder="Nama Pembeli">
+  </div>
+
+  <div class="card">
+    <h3>Menu</h3>
+    <div id="menuPembeli"></div>
+  </div>
+
+  <div class="total-box">
+    Total: Rp <span id="total">0</span>
+  </div>
+
+  <div class="card">
+    <textarea id="catatan" placeholder="Catatan: pedas / tidak, dll"></textarea>
+  </div>
+
+  <button onclick="pesanWA()">Pesan via WhatsApp</button>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="page">
+  <button onclick="kembaliAdmin()">⬅ Kembali</button>
+
+  <div class="card" id="loginBox">
+    <input type="password" id="password" placeholder="Password admin">
+    <button onclick="loginAdmin()">Login</button>
+  </div>
+
+  <div class="card" id="dashboard" style="display:none">
+    <h3>Kelola Menu</h3>
+    <div id="adminMenu"></div>
+
+    <h4>Tambah Menu</h4>
+    <input id="menuBaru" placeholder="Nama menu">
+    <input id="hargaBaru" type="number" placeholder="Harga">
+    <input id="stokBaru" type="number" placeholder="Stok">
+    <button onclick="tambahMenu()">Tambah</button>
+
+    <h3>Riwayat Pesanan</h3>
+    <div id="riwayat"></div>
+  </div>
+</div>
+
+<script>
+/* ===== PWA ===== */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+}
+
+/* ===== DATA ===== */
+let menu=[
+ {nama:"Bakso Biasa",harga:12000,stok:20},
+ {nama:"Bakso Urat",harga:15000,stok:15},
+ {nama:"Es Teh",harga:4000,stok:30}
+];
+let riwayatPesanan=[];
+
+/* ===== NAV ===== */
+const home=document.getElementById("home");
+const pembeli=document.getElementById("pembeli");
+const admin=document.getElementById("admin");
+
+function kePembeli(){home.classList.add("exit");pembeli.classList.add("active");renderMenuPembeli();}
+function kembali(){pembeli.classList.remove("active");home.classList.remove("exit");home.classList.add("active");}
+function keAdmin(){home.classList.add("exit");admin.classList.add("active");}
+function kembaliAdmin(){admin.classList.remove("active");home.classList.remove("exit");home.classList.add("active");}
+
+/* ===== PEMBELI ===== */
+function renderMenuPembeli(){
+ let html="";
+ menu.forEach((m,i)=>{
+  html+=`
+   <div class="menu-item">
+    <div>
+      <b>${m.nama}</b><br>
+      <small>Rp ${m.harga} | Stok ${m.stok}</small>
+    </div>
+    <input type="number" min="0" onchange="updateTotal()">
+   </div>`;
+ });
+ menuPembeli.innerHTML=html;
+}
+
+function updateTotal(){
+ let total=0;
+ document.querySelectorAll("#menuPembeli .menu-item").forEach((el,i)=>{
+  let qty=el.querySelector("input").value;
+  total+=qty*menu[i].harga;
+ });
+ document.getElementById("total").innerText=total;
+}
+
+function pesanWA(){
+ let nama=document.getElementById("nama").value;
+ let cat=document.getElementById("catatan").value;
+ let total=document.getElementById("total").innerText;
+
+ riwayatPesanan.push({nama,total,catatan:cat});
+ renderRiwayat();
+
+ let pesan=`Bakso Mama Rendy%0ANama: ${nama}%0ATotal: Rp ${total}%0ACatatan: ${cat}`;
+ window.open(`https://wa.me/6282260575636?text=${pesan}`);
+}
+
+/* ===== ADMIN ===== */
+function loginAdmin(){
+ if(password.value==="admin123"){
+  loginBox.style.display="none";
+  dashboard.style.display="block";
+  renderAdminMenu();
+  renderRiwayat();
+ }else alert("Password salah");
+}
+
+function renderAdminMenu(){
+ let html="";
+ menu.forEach((m,i)=>{
+  html+=`
+   <div class="menu-item">
+    <b>${m.nama}</b>
+    <input type="number" value="${m.harga}" onchange="menu[${i}].harga=this.value">
+    <input type="number" value="${m.stok}" onchange="menu[${i}].stok=this.value">
+   </div>`;
+ });
+ adminMenu.innerHTML=html;
+}
+
+function tambahMenu(){
+ menu.push({
+  nama:menuBaru.value,
+  harga:Number(hargaBaru.value),
+  stok:Number(stokBaru.value)
+ });
+ renderAdminMenu();
+}
+
+function renderRiwayat(){
+ let html="";
+ riwayatPesanan.forEach(r=>{
+  html+=`
+   <div class="card">
+    <b>${r.nama}</b><br>
+    Total: Rp ${r.total}<br>
+    Catatan: ${r.catatan}
+   </div>`;
+ });
+ riwayat.innerHTML=html;
+}
+</script>
+
+</body>
+</html>
